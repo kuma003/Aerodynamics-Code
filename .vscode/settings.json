@@ -1,0 +1,8 @@
+{
+  "python" :{
+    "editor.tabSize": 4
+  },
+  "[toml]": {
+    "editor.tabSize": 2
+  }
+}
