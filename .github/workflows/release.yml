@@ -83,24 +83,17 @@ jobs:
           $zipName = "aerodynamics-${{ steps.get_version.outputs.version }}-windows.zip"
           Compress-Archive -Path (Join-Path $found '*') -DestinationPath $zipName
 
-      - name: Create Release
-        id: create_release
-        uses: actions/create-release@v1
+      - name: Create Release and upload asset
+        uses: softprops/action-gh-release@v1
         with:
+          files: |
+            aerodynamics-${{ steps.get_version.outputs.version }}-windows.zip
           tag_name: v${{ steps.get_version.outputs.version }}
-          release_name: v${{ steps.get_version.outputs.version }}
+          name: v${{ steps.get_version.outputs.version }}
           draft: false
           prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Upload Release Asset
-        uses: actions/upload-release-asset@v1
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./aerodynamics-${{ steps.get_version.outputs.version }}-windows.zip
-          asset_name: aerodynamics-${{ steps.get_version.outputs.version }}-windows.zip
-          asset_content_type: application/zip
         
 
         
