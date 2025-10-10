@@ -12,10 +12,12 @@ from pyqtgraph.Qt.QtGui import QRegularExpressionValidator
 from pyqtgraph.Qt.QtCore import QRegularExpression
 
 import os
+import random
 
 # 葉ノードに割り当てるカスタムロール
 # それぞれの要素が表示されるか否かを管理
 ROLE_VISIBLE = QtCore.Qt.ItemDataRole.UserRole
+ROLE_COLOR = ROLE_VISIBLE + 1
 
 float_regex = QRegularExpression(r"^[+-]?(?:\d+(?:\.\d+)?|\.\d+)$")
 float_input_validator = QRegularExpressionValidator(float_regex)
@@ -81,11 +83,9 @@ class MainWindow(QSplitter):
         # シミュ条件入力エリアを追加
         sim_condition_label = self._create_section_title("シミュレーション条件")
         self.simulation_layout.addWidget(sim_condition_label)
-        # Scatter/Detail 選択
-        self.sim_condition_combo = QtWidgets.QComboBox()
-        self.sim_condition_combo.addItem("散布", "Scatter")
-        self.sim_condition_combo.addItem("詳細", "Detail")
-        self.simulation_layout.addWidget(self.sim_condition_combo)
+        # シミュ条件入力フォーム
+        self.simulation_config_widget = self._create_simulation_config_widget()
+        self.simulation_layout.addWidget(self.simulation_config_widget)
 
         self._add_separator(self.simulation_layout)
 
@@ -103,10 +103,10 @@ class MainWindow(QSplitter):
         self.wind_forms_stack.setFixedHeight(max_form_height)
         self.simulation_layout.addWidget(self.wind_forms_stack)
 
-        self.sim_condition_combo.currentIndexChanged.connect(
+        self.simulation_mode_combo.currentIndexChanged.connect(
             self._on_sim_condition_changed
         )
-        self._on_sim_condition_changed(self.sim_condition_combo.currentIndex())
+        self._on_sim_condition_changed(0)
 
         self._add_separator(self.simulation_layout)
 
@@ -163,7 +163,7 @@ class MainWindow(QSplitter):
             1, QtWidgets.QHeaderView.ResizeMode.Fixed
         )  # 2列目は固定幅
         self.tree_widget.setColumnWidth(
-            1, 25
+            1, 22
         )  # アイコンボタン列の幅を固定（アイコンサイズに合わせて調整）
         self.launch_site_layout.addWidget(self.tree_widget)
 
@@ -287,9 +287,27 @@ class MainWindow(QSplitter):
         return separator
 
     def _on_sim_condition_changed(self, index: int):
-        mode = self.sim_condition_combo.itemData(index)
+        mode = self.simulation_mode_combo.itemData(index)
         if mode:
             self._update_simulation_mode(mode)
+
+    def _create_simulation_config_widget(self) -> QtWidgets.QWidget:
+        widget = self._create_form_widget()
+        form_layout: QtWidgets.QFormLayout = widget.layout()
+
+        self.simulation_mode_combo = QtWidgets.QComboBox()
+        self.simulation_mode_combo.addItem("詳細", "Detail")
+        self.simulation_mode_combo.addItem("散布", "scatter")
+
+        form_layout.addRow(
+            QtWidgets.QLabel("シミュモード: "), self.simulation_mode_combo
+        )
+
+        self.falling_type = QtWidgets.QComboBox()
+        self.falling_type.addItem("弾道", "trajectory")
+        self.falling_type.addItem("開傘", "parachute")
+        form_layout.addRow(QtWidgets.QLabel("弾道 or 開傘: "), self.falling_type)
+        return widget
 
     def _create_scatter_form_widget(self) -> QtWidgets.QWidget:
         widget = self._create_form_widget()
@@ -413,10 +431,12 @@ class MainWindow(QSplitter):
         self.real_data_label.setEnabled(enable_real_data)
 
     def build_tree(self, parent_item, node_dict):
+        if parent_item is None:
+            raise Exception("parent_item is None")
+
+        shared_leaf_color = None
         for name, children in node_dict.items():
             item = QTreeWidgetItem([name])
-            if parent_item is None:
-                raise Exception("parent_item is None")
             parent_item.addChild(item)
 
             if children and isinstance(children, dict) and children:
@@ -425,9 +445,14 @@ class MainWindow(QSplitter):
                 # 親ノードには一括切り替えアイコンボタンを追加
                 self.create_toggle_button(item)
             else:
-                # 葉ノード: visibleフラグをTrueで初期化
+                # 葉ノード: 同じ親階層で共通の色を使用
+                if shared_leaf_color is None:
+                    shared_leaf_color = self._generate_random_color()
+                color = QtGui.QColor(shared_leaf_color)
                 item.setData(0, ROLE_VISIBLE, True)
-                item.setForeground(0, QtCore.Qt.GlobalColor.black)
+                item.setData(0, ROLE_COLOR, color)
+                self._apply_item_color(item, color)
+                self.create_color_button(item)
 
     def create_toggle_button(self, parent_item):
         """親ノード用のアイコンボタンを作成"""
@@ -448,6 +473,58 @@ class MainWindow(QSplitter):
 
         self.tree_widget.setItemWidget(parent_item, 1, toggle_button)
 
+    def create_color_button(self, item):
+        """葉ノード用のカラーパレットボタンを作成"""
+        color_button = QtWidgets.QPushButton()
+        color_button.setFlat(True)
+        color_button.setFixedSize(15, 15)
+        color_button.clicked.connect(
+            lambda checked=False, it=item: self.on_color_button_clicked(it)
+        )
+
+        self.tree_widget.setItemWidget(item, 1, color_button)
+
+        color = item.data(0, ROLE_COLOR)
+        if isinstance(color, QtGui.QColor):
+            self._update_color_button_appearance(color_button, color)
+
+    def on_color_button_clicked(self, item):
+        current_color = item.data(0, ROLE_COLOR)
+        if not isinstance(current_color, QtGui.QColor):
+            current_color = QtGui.QColor(QtCore.Qt.GlobalColor.black)
+
+        selected_color = QtWidgets.QColorDialog.getColor(
+            current_color, self, "色を選択"
+        )
+        if selected_color.isValid():
+            item.setData(0, ROLE_COLOR, selected_color)
+            self._apply_item_color(item, selected_color)
+
+            button = self.tree_widget.itemWidget(item, 1)
+            if isinstance(button, QtWidgets.QPushButton):
+                self._update_color_button_appearance(button, selected_color)
+
+    def _update_color_button_appearance(self, button: QtWidgets.QPushButton, color):
+        button.setStyleSheet(
+            "QPushButton {"
+            f"background-color: {color.name()};"
+            "border: 1px solid #666;"
+            "padding: 0px;"
+            "}"
+        )
+
+    def _generate_random_color(self) -> QtGui.QColor:
+        hue = random.randint(0, 359)
+        saturation = random.randint(150, 255)
+        value = random.randint(180, 255)
+        return QtGui.QColor.fromHsv(hue, saturation, value)
+
+    def _apply_item_color(self, item: QTreeWidgetItem, color: QtGui.QColor):
+        if item.data(0, ROLE_VISIBLE):
+            base_text_color = QtGui.QColor(QtCore.Qt.GlobalColor.black)
+            item.setForeground(0, QtGui.QBrush(base_text_color))
+            item.setBackground(0, QtGui.QBrush(QtGui.QColor(0, 0, 0, 0)))
+
     def update_toggle_button_icon(self, button, all_visible):
         """ボタンのアイコンを更新"""
         if all_visible:
@@ -465,9 +542,18 @@ class MainWindow(QSplitter):
             item.setData(0, ROLE_VISIBLE, visible)
             # 色変更
             if visible:
-                item.setForeground(0, QtCore.Qt.GlobalColor.black)
+                color = item.data(0, ROLE_COLOR)
+                if isinstance(color, QtGui.QColor):
+                    self._apply_item_color(item, color)
+                else:
+                    self._apply_item_color(
+                        item, QtGui.QColor(QtCore.Qt.GlobalColor.black)
+                    )
             else:
-                item.setForeground(0, QtCore.Qt.GlobalColor.gray)
+                item.setForeground(
+                    0, QtGui.QBrush(QtGui.QColor(QtCore.Qt.GlobalColor.gray))
+                )
+                item.setBackground(0, QtGui.QBrush(QtGui.QColor(0, 0, 0, 0)))
 
     def toggle_all_children(self, button, parent_item):
         """親ノード配下のすべての葉ノードの可視状態を一括で切り替える"""
@@ -484,9 +570,18 @@ class MainWindow(QSplitter):
         for node in leaf_nodes:
             node.setData(0, ROLE_VISIBLE, new_state)
             if new_state:
-                node.setForeground(0, QtCore.Qt.GlobalColor.black)
+                color = node.data(0, ROLE_COLOR)
+                if isinstance(color, QtGui.QColor):
+                    self._apply_item_color(node, color)
+                else:
+                    self._apply_item_color(
+                        node, QtGui.QColor(QtCore.Qt.GlobalColor.black)
+                    )
             else:
-                node.setForeground(0, QtCore.Qt.GlobalColor.gray)
+                node.setForeground(
+                    0, QtGui.QBrush(QtGui.QColor(QtCore.Qt.GlobalColor.gray))
+                )
+                node.setBackground(0, QtGui.QBrush(QtGui.QColor(0, 0, 0, 0)))
 
         # ボタンのアイコンを更新
         self.update_toggle_button_icon(button, new_state)
