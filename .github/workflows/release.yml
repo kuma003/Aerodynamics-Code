@@ -7,82 +7,98 @@ on:
   workflow_dispatch:
         
 jobs:
-    windows:
-        name: Release for Windows
-        runs-on: windows-latest
+  windows:
+    name: Release for Windows
+    runs-on: windows-latest
 
-        steps:
-        - uses: actions/checkout@v3
-        - name: Set up Python
-          uses: actions/setup-python@v4
-          with:
-            python-version: '3.11'
-            architecture: 'x64'
+    steps:
+      - uses: actions/checkout@v3
 
-        - name: Extract version from pyproject.toml
-          id: get_version
-          shell: pwsh
-          run: |
-            $text = Get-Content pyproject.toml -Raw
-            if ($text -match 'version\s*=\s*"([0-9]+\.[0-9]+\.[0-9]+)"') {
-              "version=$($matches[1])" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
-            } else {
-              Write-Error "version not found in pyproject.toml"
-            }
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+          architecture: 'x64'
 
+      - name: Extract version from pyproject.toml
+        id: get_version
+        shell: pwsh
+        run: |
+          $text = Get-Content pyproject.toml -Raw
+          if ($text -match 'version\s*=\s*"([0-9]+\.[0-9]+\.[0-9]+)"') {
+            "version=$($matches[1])" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          } else {
+            Write-Error "version not found in pyproject.toml"
+          }
 
-        - name: Install project runtime dependencies
-          run: |
-            python -m pip install --upgrade pip
-            pip install .
+      - name: Restore clcache
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/clcache
+          key: clcache-${{ runner.os }}-python-3.11-${{ hashFiles('**/pyproject.toml') }}
 
-        - name: Nuitka setup + build
-          uses: Nuitka/Nuitka-Action@main
-          with:
-            nuitka-version: main
-            script-name: main.py
-            mode: standalone
-            enable-plugins: pyside6
-            include-data-dir: |
-              icons=icons
+      - name: Cache pip downloads
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/pip-cache
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/pyproject.toml') }}
 
-        - name: Package Nuitka output
-          shell: pwsh
-          run: |
-            # Nuitka action creates a dist directory; try common names and pick the first existing one
-            $candidates = @('main.dist','main.exe.dist','build_output','dist')
-            $found = $null
-            foreach ($c in $candidates) {
-              if (Test-Path $c) { $found = $c; break }
-            }
-            if (-not $found) {
-              # try any folder ending with .dist
-              $dirs = Get-ChildItem -Directory | Where-Object { $_.Name -like '*.dist' }
-              if ($dirs.Count -gt 0) { $found = $dirs[0].Name }
-            }
-            if (-not $found) { Write-Error "Could not find Nuitka output directory"; exit 1 }
-            Write-Host "Found build output: $found"
-            $zipName = "aerodynamics-${{ steps.get_version.outputs.version }}-windows.zip"
-            Compress-Archive -Path (Join-Path $found '*') -DestinationPath $zipName
+      - name: Install project runtime dependencies
+        env:
+          PIP_CACHE_DIR: ${{ runner.temp }}/pip-cache
+        run: |
+          python -m pip install --upgrade pip
+          pip install .
 
-        - name: Create Release
-          id: create_release
-          uses: actions/create-release@v1
-          with:
-            tag_name: v${{ steps.get_version.outputs.version }}
-            release_name: v${{ steps.get_version.outputs.version }}
-            draft: false
-            prerelease: false
-          env:
-            GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Nuitka setup + build
+        uses: Nuitka/Nuitka-Action@main
+        env:
+          CLCACHE_DIR: ${{ runner.temp }}/clcache
+        with:
+          nuitka-version: main
+          script-name: main.py
+          jobs: 4
+          mode: standalone
+          enable-plugins: pyside6
+          include-data-dir: |
+            icons=icons
 
-        - name: Upload Release Asset
-          uses: actions/upload-release-asset@v1
-          with:
-            upload_url: ${{ steps.create_release.outputs.upload_url }}
-            asset_path: ./aerodynamics-${{ steps.get_version.outputs.version }}-windows.zip
-            asset_name: aerodynamics-${{ steps.get_version.outputs.version }}-windows.zip
-            asset_content_type: application/zip
+      - name: Package Nuitka output
+        shell: pwsh
+        run: |
+          # Look for .dist directories under build/ first, then fallback to any .dist in repo
+          $found = $null
+          if (Test-Path build) {
+            $dirs = Get-ChildItem -Path build -Directory -Filter '*.dist' -ErrorAction SilentlyContinue
+            if ($dirs -and $dirs.Count -gt 0) { $found = $dirs[0].FullName }
+          }
+          if (-not $found) {
+            $dirs = Get-ChildItem -Directory -Recurse -Filter '*.dist' -ErrorAction SilentlyContinue
+            if ($dirs -and $dirs.Count -gt 0) { $found = $dirs[0].FullName }
+          }
+          if (-not $found) { Write-Error "Could not find Nuitka output directory"; exit 1 }
+          Write-Host "Found build output: $found"
+          $zipName = "aerodynamics-${{ steps.get_version.outputs.version }}-windows.zip"
+          Compress-Archive -Path (Join-Path $found '*') -DestinationPath $zipName
+
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        with:
+          tag_name: v${{ steps.get_version.outputs.version }}
+          release_name: v${{ steps.get_version.outputs.version }}
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload Release Asset
+        uses: actions/upload-release-asset@v1
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./aerodynamics-${{ steps.get_version.outputs.version }}-windows.zip
+          asset_name: aerodynamics-${{ steps.get_version.outputs.version }}-windows.zip
+          asset_content_type: application/zip
         
 
         
