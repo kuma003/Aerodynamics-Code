@@ -17,7 +17,7 @@ class kml_placemark:
 @dataclass
 class kml_folder:
     name: str
-    folders: List[kml_folder]
+    folders: List["kml_folder"]
     placemarks: List[kml_placemark]
 
 
@@ -38,7 +38,6 @@ def parse_folder(folder: Any) -> kml_folder:
         geometry = None
 
         if hasattr(placemark, "Point"):
-            # Disregard altitude if present
             coordinates = placemark.Point.coordinates.text.strip().split(",")[:2]
             geometry = Point(float(coordinates[0]), float(coordinates[1]))
         elif hasattr(placemark, "LineString"):
@@ -52,7 +51,7 @@ def parse_folder(folder: Any) -> kml_folder:
                 tuple(map(float, coord.strip().split(",")))[:2]
                 for coord in placemark.Polygon.outerBoundaryIs.LinearRing.coordinates.text.strip().split()
             ]
-            coordinates.append(coordinates[0])  # Ensure the polygon is closed
+            coordinates.append(coordinates[0])
             geometry = Polygon(coordinates)
 
         if geometry:

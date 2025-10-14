@@ -1,7 +1,8 @@
 import sys
 
 from pyqtgraph.Qt.QtWidgets import QApplication
-from gui import MainWindow
+
+from libs.gui import MainWindow
 
 
 def main():
