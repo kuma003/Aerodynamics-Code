@@ -18,6 +18,7 @@ import random
 # それぞれの要素が表示されるか否かを管理
 ROLE_VISIBLE = QtCore.Qt.ItemDataRole.UserRole
 ROLE_COLOR = ROLE_VISIBLE + 1
+ROLE_ZONE = ROLE_COLOR + 1
 
 float_regex = QRegularExpression(r"^[+-]?(?:\d+(?:\.\d+)?|\.\d+)$")
 float_input_validator = QRegularExpressionValidator(float_regex)
@@ -131,9 +132,7 @@ class MainWindow(QSplitter):
         self.tab_widget.addTab(self.launch_site_tab, "射場")
 
         # シミュコンフィグを選択するトグルボタンを追加
-        sim_config_button = QtWidgets.QToolButton()
-        sim_config_button.setText("シミュレーション設定を選択")
-        self.launch_site_layout.addWidget(sim_config_button)
+        self.launch_site_layout.addWidget(self._create_section_title("射場設定"))
 
         # インポートボタンを追加
         kml_import_button = QtWidgets.QPushButton("KMLをインポート")
@@ -143,7 +142,7 @@ class MainWindow(QSplitter):
         # 発射地点プロパティのツリービューを追加（固定高さでスクロールバー付き）
         self.tree_widget = QTreeWidget()
         self.tree_widget.setHeaderHidden(True)  # ヘッダーを非表示
-        self.tree_widget.setColumnCount(2)  # 2列に設定
+        self.tree_widget.setColumnCount(3)  # 3列に設定: ラベル, カラー, ゾーン/トグル
         self.tree_widget.setFixedHeight(300)  # fixed height
         self.tree_widget.setFrameShape(QtWidgets.QFrame.Shape.Box)  # 枠線を設定
         self.tree_widget.setLineWidth(1)  # 枠線の太さ
@@ -161,10 +160,12 @@ class MainWindow(QSplitter):
         )  # 1列目は伸縮
         header.setSectionResizeMode(
             1, QtWidgets.QHeaderView.ResizeMode.Fixed
-        )  # 2列目は固定幅
-        self.tree_widget.setColumnWidth(
-            1, 22
-        )  # アイコンボタン列の幅を固定（アイコンサイズに合わせて調整）
+        )  # 2列目は固定幅（カラー）
+        header.setSectionResizeMode(
+            2, QtWidgets.QHeaderView.ResizeMode.Fixed
+        )  # 3列目は固定幅（トグル/プルダウン）
+        self.tree_widget.setColumnWidth(1, 28)  # カラー列の幅
+        self.tree_widget.setColumnWidth(2, 40)  # トグル / ボタン列の幅
         self.launch_site_layout.addWidget(self.tree_widget)
 
         # ツリー構造の例
@@ -176,7 +177,12 @@ class MainWindow(QSplitter):
                 "項目4": {},
             },
             "射場B": {
-                "項目1": {},
+                "射場A": {
+                    "項目1": {},
+                    "項目2": {},
+                    "項目3": {},
+                    "項目4": {},
+                },
                 "項目2": {},
                 "項目3": {},
                 "項目4": {},
@@ -451,6 +457,8 @@ class MainWindow(QSplitter):
                 color = QtGui.QColor(shared_leaf_color)
                 item.setData(0, ROLE_VISIBLE, True)
                 item.setData(0, ROLE_COLOR, color)
+                # デフォルトは落下禁止域（×）にする
+                item.setData(0, ROLE_ZONE, "forbidden")
                 self._apply_item_color(item, color)
                 self.create_color_button(item)
 
@@ -470,8 +478,8 @@ class MainWindow(QSplitter):
                 btn, it
             )
         )
-
-        self.tree_widget.setItemWidget(parent_item, 1, toggle_button)
+        # 親ノードのトグルは3列目に配置
+        self.tree_widget.setItemWidget(parent_item, 2, toggle_button)
 
     def create_color_button(self, item):
         """葉ノード用のカラーパレットボタンを作成"""
@@ -482,7 +490,11 @@ class MainWindow(QSplitter):
             lambda checked=False, it=item: self.on_color_button_clicked(it)
         )
 
+        # カラーは2列目に配置
         self.tree_widget.setItemWidget(item, 1, color_button)
+
+        # 併せて落下域切替ボタンを作成（〇/×）
+        self.create_zone_button(item)
 
         color = item.data(0, ROLE_COLOR)
         if isinstance(color, QtGui.QColor):
@@ -512,6 +524,42 @@ class MainWindow(QSplitter):
             "padding: 0px;"
             "}"
         )
+
+    def create_zone_button(self, item: QTreeWidgetItem):
+        """葉ノード用の落下域切替ボタン（〇/×）を作成"""
+        btn = QtWidgets.QPushButton()
+        btn.setFlat(True)
+        btn.setCheckable(True)
+        btn.setFixedSize(28, 20)
+
+        # 内部データに基づき初期状態を設定
+        zone = item.data(0, ROLE_ZONE)
+        # デフォルトは 'forbidden' (= ×)
+        if zone is None:
+            zone = "forbidden"
+            item.setData(0, ROLE_ZONE, zone)
+
+        def _apply_zone_appearance(b: QtWidgets.QPushButton, z):
+            if z == "allowed":
+                b.setChecked(True)
+                b.setText("〇")
+                b.setStyleSheet("QPushButton { color: green; font-weight: bold; }")
+            else:
+                b.setChecked(False)
+                b.setText("×")
+                b.setStyleSheet("QPushButton { color: red; font-weight: bold; }")
+
+        _apply_zone_appearance(btn, zone)
+
+        def _on_zone_toggled(checked, it=item, b=btn):
+            new_zone = "allowed" if checked else "forbidden"
+            it.setData(0, ROLE_ZONE, new_zone)
+            _apply_zone_appearance(b, new_zone)
+
+        btn.toggled.connect(_on_zone_toggled)
+
+        # 3列目に配置
+        self.tree_widget.setItemWidget(item, 2, btn)
 
     def _generate_random_color(self) -> QtGui.QColor:
         hue = random.randint(0, 359)
