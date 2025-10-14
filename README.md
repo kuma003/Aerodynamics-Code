@@ -27,12 +27,3 @@ uv run pyinstaller --clean --noconfirm main.spec
 ```
 
 ビルド結果は `dist/main` フォルダに配置されます。起動する際は `dist/main/main.exe` を利用してください。
-
-## 自動リリース (GitHub Actions)
-
-`main` ブランチへ push すると、GitHub Actions が自動でビルドを行い、成果物を zip 化して GitHub Release を作成します。
-
-- バージョンは `pyproject.toml` の `version` フィールドを読み取り、`v<version>` のタグを作成します。
-- Windows 用のスタンドアロン実行ファイルは Nuitka を使ってビルドされ、`aerodynamics-<version>-windows.zip` というアセット名でリリースに添付されます。
-
-ワークフローの詳細は `.github/workflows/release.yml` を参照してください。
