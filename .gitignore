@@ -209,3 +209,6 @@ __marimo__/
 # nuitka
 *.build/
 *.dist/
+
+# Other files to ignore
+*.kml
