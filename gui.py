@@ -11,14 +11,19 @@ from pyqtgraph.Qt.QtWidgets import (
 from pyqtgraph.Qt.QtGui import QRegularExpressionValidator
 from pyqtgraph.Qt.QtCore import QRegularExpression
 
+from typing import Optional, Any
+
+from kml_reader import read_kml, kml_folder, kml_placemark
 import os
 import random
+from shapely.geometry import Point, LineString, Polygon
 
 # 葉ノードに割り当てるカスタムロール
 # それぞれの要素が表示されるか否かを管理
 ROLE_VISIBLE = QtCore.Qt.ItemDataRole.UserRole
 ROLE_COLOR = ROLE_VISIBLE + 1
 ROLE_ZONE = ROLE_COLOR + 1
+ROLE_GEOMETRY = ROLE_ZONE + 1
 
 float_regex = QRegularExpression(r"^[+-]?(?:\d+(?:\.\d+)?|\.\d+)$")
 float_input_validator = QRegularExpressionValidator(float_regex)
@@ -136,14 +141,13 @@ class MainWindow(QSplitter):
 
         # インポートボタンを追加
         kml_import_button = QtWidgets.QPushButton("KMLをインポート")
-        # kml_import_button.clicked.connect(self.import_kml)
+        kml_import_button.clicked.connect(self.import_kml)
         self.launch_site_layout.addWidget(kml_import_button)
 
-        # 発射地点プロパティのツリービューを追加（固定高さでスクロールバー付き）
+        # 発射地点プロパティのツリービューを作成
         self.tree_widget = QTreeWidget()
         self.tree_widget.setHeaderHidden(True)  # ヘッダーを非表示
         self.tree_widget.setColumnCount(3)  # 3列に設定: ラベル, カラー, ゾーン/トグル
-        self.tree_widget.setFixedHeight(300)  # fixed height
         self.tree_widget.setFrameShape(QtWidgets.QFrame.Shape.Box)  # 枠線を設定
         self.tree_widget.setLineWidth(1)  # 枠線の太さ
         self.tree_widget.setVerticalScrollBarPolicy(
@@ -166,42 +170,12 @@ class MainWindow(QSplitter):
         )  # 3列目は固定幅（トグル/プルダウン）
         self.tree_widget.setColumnWidth(1, 28)  # カラー列の幅
         self.tree_widget.setColumnWidth(2, 40)  # トグル / ボタン列の幅
-        self.launch_site_layout.addWidget(self.tree_widget)
+        self.tree_widget.setSizePolicy(
+            QtWidgets.QSizePolicy.Policy.Expanding,
+            QtWidgets.QSizePolicy.Policy.Expanding,
+        )
 
-        # ツリー構造の例
-        example_tree = {
-            "射場A": {
-                "項目1": {},
-                "項目2": {},
-                "項目3": {},
-                "項目4": {},
-            },
-            "射場B": {
-                "射場A": {
-                    "項目1": {},
-                    "項目2": {},
-                    "項目3": {},
-                    "項目4": {},
-                },
-                "項目2": {},
-                "項目3": {},
-                "項目4": {},
-            },
-            "射場C": {
-                "項目1": {},
-                "項目2": {},
-                "項目3": {},
-                "項目4": {},
-            },
-            "射場D": {
-                "項目1": {},
-                "項目2": {},
-                "項目3": {},
-                "項目4": {},
-            },
-        }
-        self.build_tree(self.tree_widget.invisibleRootItem(), example_tree)
-        self.tree_widget.expandAll()
+        self.tree_widget.clear()
 
         # 葉ノードクリック時のvisibleトグル
         self.tree_widget.itemClicked.connect(self.on_item_clicked)
@@ -225,6 +199,10 @@ class MainWindow(QSplitter):
         # toggle_button.clicked.connect(self.toggle_side_panel)
         main_layout.addWidget(toggle_button)
 
+        # ツリービューと射場情報を分割表示できるようにスプリッターを配置
+        self.launch_site_splitter = QtWidgets.QSplitter(QtCore.Qt.Orientation.Vertical)
+        self.launch_site_splitter.addWidget(self.tree_widget)
+
         # 射場の情報
         self.launch_site_info = QtWidgets.QTextEdit()
         self.launch_site_info.setReadOnly(True)
@@ -240,7 +218,11 @@ class MainWindow(QSplitter):
             "緯度: <br>"
             "経度: <br>"
         )
-        self.launch_site_layout.addWidget(self.launch_site_info)
+        self.launch_site_info.setMinimumHeight(120)
+        self.launch_site_splitter.addWidget(self.launch_site_info)
+        self.launch_site_splitter.setStretchFactor(0, 3)
+        self.launch_site_splitter.setStretchFactor(1, 1)
+        self.launch_site_layout.addWidget(self.launch_site_splitter)
 
     def _create_section_title(self, text: str) -> QtWidgets.QLabel:
         label = QtWidgets.QLabel(text)
@@ -436,31 +418,80 @@ class MainWindow(QSplitter):
         self.real_data_combo.setEnabled(enable_real_data)
         self.real_data_label.setEnabled(enable_real_data)
 
-    def build_tree(self, parent_item, node_dict):
-        if parent_item is None:
-            raise Exception("parent_item is None")
+    def build_tree_from_kml(self, root_folder: Optional[kml_folder]):
+        self.tree_widget.clear()
+        if root_folder is None:
+            return
 
-        shared_leaf_color = None
-        for name, children in node_dict.items():
-            item = QTreeWidgetItem([name])
-            parent_item.addChild(item)
+        self._add_folder_item(self.tree_widget.invisibleRootItem(), root_folder)
+        self.tree_widget.expandAll()
 
-            if children and isinstance(children, dict) and children:
-                # 親ノード
-                self.build_tree(item, children)
-                # 親ノードには一括切り替えアイコンボタンを追加
-                self.create_toggle_button(item)
-            else:
-                # 葉ノード: 同じ親階層で共通の色を使用
-                if shared_leaf_color is None:
-                    shared_leaf_color = self._generate_random_color()
-                color = QtGui.QColor(shared_leaf_color)
-                item.setData(0, ROLE_VISIBLE, True)
-                item.setData(0, ROLE_COLOR, color)
-                # デフォルトは落下禁止域（×）にする
-                item.setData(0, ROLE_ZONE, "forbidden")
-                self._apply_item_color(item, color)
-                self.create_color_button(item)
+    def _add_folder_item(
+        self, parent_item: QTreeWidgetItem, folder: kml_folder
+    ) -> QTreeWidgetItem:
+        item = QTreeWidgetItem([folder.name or "Unnamed Folder"])
+        parent_item.addChild(item)
+
+        for child_folder in folder.folders or []:
+            self._add_folder_item(item, child_folder)
+
+        if folder.placemarks:
+            shared_leaf_color = self._generate_random_color()
+            for placemark in folder.placemarks:
+                self._add_placemark_item(item, placemark, shared_leaf_color)
+
+        if self.get_all_leaf_nodes(item):
+            self.create_toggle_button(item)
+
+        return item
+
+    def _add_placemark_item(
+        self,
+        parent_item: QTreeWidgetItem,
+        placemark: kml_placemark,
+        shared_color: QtGui.QColor,
+    ) -> QTreeWidgetItem:
+        item = QTreeWidgetItem([placemark.name or "Unnamed Placemark"])
+        parent_item.addChild(item)
+
+        color = QtGui.QColor(shared_color)
+        item.setData(0, ROLE_VISIBLE, True)
+        item.setData(0, ROLE_COLOR, color)
+        item.setData(0, ROLE_ZONE, "forbidden")
+        item.setData(0, ROLE_GEOMETRY, placemark.geometry)
+        tooltip = self._format_geometry_tooltip(placemark.geometry)
+        if tooltip:
+            item.setToolTip(0, tooltip)
+            item.setToolTip(1, tooltip)
+            item.setToolTip(2, tooltip)
+        self._apply_item_color(item, color)
+        self.create_color_button(item)
+
+        return item
+
+    def _format_geometry_tooltip(self, geometry: Any) -> str:
+        if geometry is None:
+            return ""
+
+        if isinstance(geometry, Point):
+            lat = geometry.y
+            lon = geometry.x
+            return "タイプ: 点\n" f"緯度: {lat:.6f}\n" f"経度: {lon:.6f}"
+
+        if isinstance(geometry, LineString):
+            coords = list(geometry.coords)
+            return f"タイプ: 線 ({len(coords)} 点)"
+
+        if isinstance(geometry, Polygon):
+            exterior_coords = (
+                list(geometry.exterior.coords) if geometry.exterior else []
+            )
+            header = f"タイプ: ポリゴン ({len(exterior_coords)} 点)"
+            lat = geometry.centroid.y
+            lon = geometry.centroid.x
+            return f"{header}\n重心緯度: {lat:.6f}\n重心経度: {lon:.6f}"
+
+        return f"タイプ: {getattr(geometry, 'geom_type', '不明')}"
 
     def create_toggle_button(self, parent_item):
         """親ノード用のアイコンボタンを作成"""
@@ -494,11 +525,17 @@ class MainWindow(QSplitter):
         self.tree_widget.setItemWidget(item, 1, color_button)
 
         # 併せて落下域切替ボタンを作成（〇/×）
-        self.create_zone_button(item)
+        zone_button = self.create_zone_button(item)
 
         color = item.data(0, ROLE_COLOR)
         if isinstance(color, QtGui.QColor):
             self._update_color_button_appearance(color_button, color)
+
+        tooltip = self._format_geometry_tooltip(item.data(0, ROLE_GEOMETRY))
+        if tooltip:
+            color_button.setToolTip(tooltip)
+            if zone_button is not None:
+                zone_button.setToolTip(tooltip)
 
     def on_color_button_clicked(self, item):
         current_color = item.data(0, ROLE_COLOR)
@@ -560,6 +597,7 @@ class MainWindow(QSplitter):
 
         # 3列目に配置
         self.tree_widget.setItemWidget(item, 2, btn)
+        return btn
 
     def _generate_random_color(self) -> QtGui.QColor:
         hue = random.randint(0, 359)
@@ -649,3 +687,25 @@ class MainWindow(QSplitter):
 
         traverse(parent_item)
         return leaf_nodes
+
+    def import_kml(self):
+        options = QtWidgets.QFileDialog.Options()
+        options |= QtWidgets.QFileDialog.Option.ReadOnly
+        file_path, _ = QtWidgets.QFileDialog.getOpenFileName(
+            self,
+            "KMLファイルを選択",
+            "",
+            "KML Files (*.kml);;All Files (*)",
+            options=options,
+        )
+        if file_path:
+            try:
+                kml_data = read_kml(file_path)
+                self.build_tree_from_kml(kml_data)
+                print("KMLデータが正常に読み込まれました。")
+            except Exception as e:
+                QtWidgets.QMessageBox.critical(
+                    self,
+                    "エラー",
+                    f"KMLファイルの読み込み中にエラーが発生しました:\n{str(e)}",
+                )

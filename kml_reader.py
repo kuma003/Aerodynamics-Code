@@ -43,13 +43,13 @@ def parse_folder(folder: Any) -> kml_folder:
             geometry = Point(float(coordinates[0]), float(coordinates[1]))
         elif hasattr(placemark, "LineString"):
             coordinates = [
-                tuple(map(float, coord.strip().split(","))[:2])
+                tuple(map(float, coord.strip().split(",")))[:2]
                 for coord in placemark.LineString.coordinates.text.strip().split()
             ]
             geometry = LineString(coordinates)
         elif hasattr(placemark, "Polygon"):
             coordinates = [
-                tuple(map(float, coord.strip().split(","))[:2])
+                tuple(map(float, coord.strip().split(",")))[:2]
                 for coord in placemark.Polygon.outerBoundaryIs.LinearRing.coordinates.text.strip().split()
             ]
             coordinates.append(coordinates[0])  # Ensure the polygon is closed
