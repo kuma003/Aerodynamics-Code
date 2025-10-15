@@ -50,8 +50,8 @@ class LaunchSiteTab(QtWidgets.QWidget):
         header.setSectionResizeMode(0, QtWidgets.QHeaderView.ResizeMode.Stretch)
         header.setSectionResizeMode(1, QtWidgets.QHeaderView.ResizeMode.Fixed)
         header.setSectionResizeMode(2, QtWidgets.QHeaderView.ResizeMode.Fixed)
-        self.tree_widget.setColumnWidth(1, 28)
-        self.tree_widget.setColumnWidth(2, 40)
+        self.tree_widget.setColumnWidth(1, 70)
+        self.tree_widget.setColumnWidth(2, 28)
         self.tree_widget.setSizePolicy(
             QtWidgets.QSizePolicy.Policy.Expanding,
             QtWidgets.QSizePolicy.Policy.Expanding,
@@ -141,8 +141,8 @@ class LaunchSiteTab(QtWidgets.QWidget):
         color = QtGui.QColor(shared_color)
         item.setData(0, ROLE_VISIBLE, True)
         item.setData(0, ROLE_COLOR, color)
-        item.setData(0, ROLE_ZONE, "forbidden")
         item.setData(0, ROLE_GEOMETRY, placemark.geometry)
+        item.setData(0, ROLE_ZONE, self._default_zone_value(placemark.geometry))
         tooltip = self._format_geometry_tooltip(placemark.geometry)
         if tooltip:
             item.setToolTip(0, tooltip)
@@ -197,8 +197,8 @@ class LaunchSiteTab(QtWidgets.QWidget):
         color_button.clicked.connect(
             lambda checked=False, it=item: self.on_color_button_clicked(it)
         )
-        self.tree_widget.setItemWidget(item, 1, color_button)
-        zone_button = self.create_zone_button(item)
+        zone_widget = self.create_zone_widget(item)
+        self.tree_widget.setItemWidget(item, 2, color_button)
 
         color = item.data(0, ROLE_COLOR)
         if isinstance(color, QtGui.QColor):
@@ -207,8 +207,15 @@ class LaunchSiteTab(QtWidgets.QWidget):
         tooltip = self._format_geometry_tooltip(item.data(0, ROLE_GEOMETRY))
         if tooltip:
             color_button.setToolTip(tooltip)
-            if zone_button is not None:
-                zone_button.setToolTip(tooltip)
+            if zone_widget is not None:
+                zone_widget.setToolTip(tooltip)
+
+    def _default_zone_value(self, geometry: Any) -> Optional[str]:
+        if isinstance(geometry, LineString):
+            return "E"
+        if isinstance(geometry, Polygon):
+            return "internal"
+        return None
 
     def on_color_button_clicked(self, item: QtWidgets.QTreeWidgetItem) -> None:
         current_color = item.data(0, ROLE_COLOR)
@@ -222,7 +229,7 @@ class LaunchSiteTab(QtWidgets.QWidget):
             item.setData(0, ROLE_COLOR, selected_color)
             self._apply_item_color(item, selected_color)
 
-            button = self.tree_widget.itemWidget(item, 1)
+            button = self.tree_widget.itemWidget(item, 2)
             if isinstance(button, QtWidgets.QPushButton):
                 self._update_color_button_appearance(button, selected_color)
 
@@ -237,41 +244,83 @@ class LaunchSiteTab(QtWidgets.QWidget):
             "}"
         )
 
-    def create_zone_button(
+    def create_zone_widget(
         self, item: QtWidgets.QTreeWidgetItem
-    ) -> QtWidgets.QPushButton:
-        btn = QtWidgets.QPushButton()
-        btn.setFlat(True)
-        btn.setCheckable(True)
-        btn.setFixedSize(28, 20)
+    ) -> Optional[QtWidgets.QWidget]:
+        geometry = item.data(0, ROLE_GEOMETRY)
+        current_zone = item.data(0, ROLE_ZONE)
 
-        zone = item.data(0, ROLE_ZONE)
-        if zone is None:
-            zone = "forbidden"
-            item.setData(0, ROLE_ZONE, zone)
+        # 点の場合は何も表示しない
+        if isinstance(geometry, Point) or geometry is None:
+            item.setData(0, ROLE_ZONE, None)
+            self.tree_widget.removeItemWidget(item, 1)
+            return None
 
-        def _apply_zone_appearance(
-            button: QtWidgets.QPushButton, zone_value: str
-        ) -> None:
-            if zone_value == "allowed":
-                button.setChecked(True)
-                button.setText("〇")
-                button.setStyleSheet("QPushButton { color: green; font-weight: bold; }")
-            else:
-                button.setChecked(False)
-                button.setText("×")
-                button.setStyleSheet("QPushButton { color: red; font-weight: bold; }")
+        if isinstance(geometry, LineString):
+            directions = ["E", "W", "S", "N"]
+            default_direction = current_zone if current_zone in directions else "E"
+            item.setData(0, ROLE_ZONE, default_direction)
 
-        _apply_zone_appearance(btn, zone)
+            btn = QtWidgets.QPushButton(default_direction)
+            btn.setFlat(True)
+            btn.setMinimumWidth(36)
+            btn.setProperty("options", directions)
+            btn.setProperty("index", directions.index(default_direction))
 
-        def _on_zone_toggled(checked: bool, it=item, button=btn) -> None:
-            new_zone = "allowed" if checked else "forbidden"
-            it.setData(0, ROLE_ZONE, new_zone)
-            _apply_zone_appearance(button, new_zone)
+            def _cycle_direction(button: QtWidgets.QPushButton, it=item) -> None:
+                options: list[str] = button.property("options")
+                index = button.property("index")
+                if not isinstance(options, list) or not isinstance(index, int):
+                    return
+                next_index = (index + 1) % len(options)
+                button.setProperty("index", next_index)
+                next_value = options[next_index]
+                button.setText(next_value)
+                it.setData(0, ROLE_ZONE, next_value)
 
-        btn.toggled.connect(_on_zone_toggled)
-        self.tree_widget.setItemWidget(item, 2, btn)
-        return btn
+            btn.clicked.connect(lambda checked=False, b=btn: _cycle_direction(b))
+            self.tree_widget.setItemWidget(item, 1, btn)
+            return btn
+
+        if isinstance(geometry, Polygon):
+            options = [("内部", "internal"), ("外部", "external")]
+            default_zone = (
+                current_zone if current_zone in {"internal", "external"} else "internal"
+            )
+            item.setData(0, ROLE_ZONE, default_zone)
+
+            default_index = next(
+                (
+                    idx
+                    for idx, (_, value) in enumerate(options)
+                    if value == default_zone
+                ),
+                0,
+            )
+            btn = QtWidgets.QPushButton(options[default_index][0])
+            btn.setFlat(True)
+            btn.setMinimumWidth(48)
+            btn.setProperty("options", options)
+            btn.setProperty("index", default_index)
+
+            def _cycle_zone(button: QtWidgets.QPushButton, it=item) -> None:
+                choices: list[tuple[str, str]] = button.property("options")
+                index = button.property("index")
+                if not isinstance(choices, list) or not isinstance(index, int):
+                    return
+                next_index = (index + 1) % len(choices)
+                button.setProperty("index", next_index)
+                label, value = choices[next_index]
+                button.setText(label)
+                it.setData(0, ROLE_ZONE, value)
+
+            btn.clicked.connect(lambda checked=False, b=btn: _cycle_zone(b))
+            self.tree_widget.setItemWidget(item, 1, btn)
+            return btn
+
+        item.setData(0, ROLE_ZONE, current_zone)
+        self.tree_widget.removeItemWidget(item, 1)
+        return None
 
     def _generate_random_color(self) -> QtGui.QColor:
         hue = random.randint(0, 359)
