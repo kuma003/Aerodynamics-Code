@@ -39,15 +39,17 @@ class LaunchSiteTab(QtWidgets.QWidget):
         layout = QtWidgets.QVBoxLayout()
         self.setLayout(layout)
 
-        layout.addWidget(create_section_title("射場設定"))
+        section = create_section_title("射場設定")
+        layout.addWidget(section)
+        section_layout = section.layout()
 
         import_button = QtWidgets.QPushButton("データをインポート (KML/.ls)")
         import_button.clicked.connect(self.import_kml)
-        layout.addWidget(import_button)
+        section_layout.addWidget(import_button)
 
         export_button = QtWidgets.QPushButton(".lsを保存")
         export_button.clicked.connect(self.export_launch_site)
-        layout.addWidget(export_button)
+        section_layout.addWidget(export_button)
 
         self.tree_widget = QtWidgets.QTreeWidget()
         self.tree_widget.setHeaderHidden(True)
@@ -92,8 +94,7 @@ class LaunchSiteTab(QtWidgets.QWidget):
         self.launch_site_splitter.addWidget(self.launch_site_info)
         self.launch_site_splitter.setStretchFactor(0, 3)
         self.launch_site_splitter.setStretchFactor(1, 1)
-
-        layout.addWidget(self.launch_site_splitter)
+        section_layout.addWidget(self.launch_site_splitter)
 
     def import_kml(self) -> None:
         options = QtWidgets.QFileDialog.Options()

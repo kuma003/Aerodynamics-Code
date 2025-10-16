@@ -46,9 +46,11 @@ class GraphConfigTab(QtWidgets.QWidget):
         layout = QtWidgets.QVBoxLayout()
         self.setLayout(layout)
 
-        layout.addWidget(create_section_title("グラフ設定"))
+        graph_section = create_section_title("グラフ設定")
+        layout.addWidget(graph_section)
 
         self.graph_form_widget = create_form_widget()
+        graph_section.layout().addWidget(self.graph_form_widget)
         self.graph_form_layout = self.graph_form_widget.layout()
 
         self.graph_width_spin = QtWidgets.QSpinBox(value=600)
@@ -58,11 +60,11 @@ class GraphConfigTab(QtWidgets.QWidget):
         self.graph_form_layout.addRow("横幅:", self.graph_width_spin)
         self.graph_form_layout.addRow("高さ:", self.graph_height_spin)
 
-        layout.addWidget(self.graph_form_widget)
-
-        layout.addWidget(create_section_title("地図設定"))
+        map_section = create_section_title("地図設定")
+        layout.addWidget(map_section)
 
         self.map_form_widget = create_form_widget()
+        map_section.layout().addWidget(self.map_form_widget)
         self.map_form_layout = self.map_form_widget.layout()
 
         self.map_combo = QtWidgets.QComboBox()
@@ -89,11 +91,11 @@ class GraphConfigTab(QtWidgets.QWidget):
         self.attribution_edit.textChanged.connect(self._on_attribution_text_changed)
         self.map_form_layout.addRow("Attribution:", self.attribution_edit)
 
-        layout.addWidget(self.map_form_widget)
-
-        layout.addWidget(create_section_title("参照座標系"))
+        crs_section = create_section_title("参照座標系")
+        layout.addWidget(crs_section)
 
         self.crs_form_widget = create_form_widget()
+        crs_section.layout().addWidget(self.crs_form_widget)
         self.crs_form_layout = self.crs_form_widget.layout()
 
         self.gcs_combo = QtWidgets.QComboBox()
@@ -120,7 +122,6 @@ class GraphConfigTab(QtWidgets.QWidget):
         variant_layout.addWidget(self.auto_variant_check)
         variant_row.setLayout(variant_layout)
         self.crs_form_layout.addRow("系/帯:", variant_row)
-        layout.addWidget(self.crs_form_widget)
 
         layout.addStretch()
 

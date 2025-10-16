@@ -1,26 +1,13 @@
 from pyqtgraph.Qt import QtCore, QtWidgets
 
 
-def create_section_title(text: str) -> QtWidgets.QLabel:
-    label = QtWidgets.QLabel(text)
-    label.setAlignment(
-        QtCore.Qt.AlignmentFlag.AlignLeft | QtCore.Qt.AlignmentFlag.AlignVCenter
-    )
-    label.setStyleSheet(
-        """
-        QLabel {
-            font-weight: bold;
-            font-size: 12pt;
-            color: #1f2a44;
-            background-color: #f0f0f0;
-            border-left: 4px solid #e0e0e0;
-            padding: 6px 10px;
-            margin-top: 6px;
-            margin-bottom: 6px;
-        }
-        """
-    )
-    return label
+def create_section_title(text: str) -> QtWidgets.QGroupBox:
+    group = QtWidgets.QGroupBox(text)
+    layout = QtWidgets.QVBoxLayout()
+    layout.setContentsMargins(12, 6, 12, 12)
+    layout.setSpacing(6)
+    group.setLayout(layout)
+    return group
 
 
 def create_form_widget() -> QtWidgets.QWidget:

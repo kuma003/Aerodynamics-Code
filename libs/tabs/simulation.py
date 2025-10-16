@@ -18,20 +18,23 @@ class SimulationTab(QtWidgets.QWidget):
         layout = QtWidgets.QVBoxLayout()
         self.setLayout(layout)
 
-        layout.addWidget(create_section_title("機体諸元ファイル選択"))
+        airframe_section = create_section_title("機体諸元ファイル選択")
+        layout.addWidget(airframe_section)
         self.airframe_file_combo = QtWidgets.QComboBox()
         self.airframe_file_combo.addItem("選択なし", None)
-        layout.addWidget(self.airframe_file_combo)
+        airframe_section.layout().addWidget(self.airframe_file_combo)
 
         add_separator(layout)
 
-        layout.addWidget(create_section_title("シミュレーション条件"))
+        simulation_section = create_section_title("シミュレーション条件")
+        layout.addWidget(simulation_section)
         self.simulation_config_widget = self._create_simulation_config_widget()
-        layout.addWidget(self.simulation_config_widget)
+        simulation_section.layout().addWidget(self.simulation_config_widget)
 
         add_separator(layout)
 
-        layout.addWidget(create_section_title("風条件設定"))
+        wind_section = create_section_title("風条件設定")
+        layout.addWidget(wind_section)
         self.wind_forms_stack = QtWidgets.QStackedWidget()
         self.scatter_form_widget = self._create_scatter_form_widget()
         self.detail_form_widget = self._create_detail_form_widget()
@@ -42,7 +45,7 @@ class SimulationTab(QtWidgets.QWidget):
             self.detail_form_widget.sizeHint().height(),
         )
         self.wind_forms_stack.setFixedHeight(max_form_height)
-        layout.addWidget(self.wind_forms_stack)
+        wind_section.layout().addWidget(self.wind_forms_stack)
 
         self.simulation_mode_combo.currentIndexChanged.connect(
             self._on_sim_condition_changed
@@ -51,13 +54,15 @@ class SimulationTab(QtWidgets.QWidget):
 
         add_separator(layout)
 
-        layout.addWidget(create_section_title("風モデル設定"))
-        layout.addWidget(self._create_wind_model_form_widget())
+        wind_model_section = create_section_title("風モデル設定")
+        layout.addWidget(wind_model_section)
+        wind_model_section.layout().addWidget(self._create_wind_model_form_widget())
 
         add_separator(layout)
 
-        layout.addWidget(create_section_title("シミュレーション設定"))
-        layout.addWidget(QtWidgets.QPushButton("実行"))
+        run_section = create_section_title("シミュレーション設定")
+        layout.addWidget(run_section)
+        run_section.layout().addWidget(QtWidgets.QPushButton("実行"))
         layout.addStretch()
 
     def _create_simulation_config_widget(self) -> QtWidgets.QWidget:
