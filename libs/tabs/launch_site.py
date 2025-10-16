@@ -1,9 +1,10 @@
+import json
 import os
 import random
 from typing import Any, Optional
 
 from pyqtgraph.Qt import QtCore, QtGui, QtWidgets
-from shapely.geometry import LineString, Point, Polygon
+from shapely.geometry import LineString, Point, Polygon, mapping, shape
 
 from ..kml_reader import kml_folder, kml_placemark, read_kml
 from ..ui_helpers import create_section_title
@@ -30,9 +31,13 @@ class LaunchSiteTab(QtWidgets.QWidget):
 
         layout.addWidget(create_section_title("射場設定"))
 
-        kml_import_button = QtWidgets.QPushButton("KMLをインポート")
-        kml_import_button.clicked.connect(self.import_kml)
-        layout.addWidget(kml_import_button)
+        import_button = QtWidgets.QPushButton("データをインポート (KML/.ls)")
+        import_button.clicked.connect(self.import_kml)
+        layout.addWidget(import_button)
+
+        export_button = QtWidgets.QPushButton(".lsを保存")
+        export_button.clicked.connect(self.export_launch_site)
+        layout.addWidget(export_button)
 
         self.tree_widget = QtWidgets.QTreeWidget()
         self.tree_widget.setHeaderHidden(True)
@@ -85,22 +90,32 @@ class LaunchSiteTab(QtWidgets.QWidget):
         options |= QtWidgets.QFileDialog.Option.ReadOnly
         file_path, _ = QtWidgets.QFileDialog.getOpenFileName(
             self,
-            "KMLファイルを選択",
+            "KML/.lsファイルを選択",
             "",
-            "KML Files (*.kml);;All Files (*)",
+            "Launch Site (*.ls);;KML Files (*.kml);;All Files (*)",
             options=options,
         )
-        if file_path:
-            try:
+        if not file_path:
+            return
+
+        suffix = os.path.splitext(file_path)[1].lower()
+
+        try:
+            if suffix == ".ls":
+                with open(file_path, "r", encoding="utf-8") as fh:
+                    data = json.load(fh)
+                self.build_tree_from_ls(data)
+                print(".lsデータが正常に読み込まれました。")
+            else:
                 kml_data = read_kml(file_path)
                 self.build_tree_from_kml(kml_data)
                 print("KMLデータが正常に読み込まれました。")
-            except Exception as exc:  # noqa: BLE001
-                QtWidgets.QMessageBox.critical(
-                    self,
-                    "エラー",
-                    f"KMLファイルの読み込み中にエラーが発生しました:\n{exc}",
-                )
+        except Exception as exc:  # noqa: BLE001
+            QtWidgets.QMessageBox.critical(
+                self,
+                "エラー",
+                f"ファイルの読み込み中にエラーが発生しました:\n{exc}",
+            )
 
     def build_tree_from_kml(self, root_folder: Optional[kml_folder]) -> None:
         self.tree_widget.clear()
@@ -109,6 +124,198 @@ class LaunchSiteTab(QtWidgets.QWidget):
 
         self._add_folder_item(self.tree_widget.invisibleRootItem(), root_folder)
         self.tree_widget.expandAll()
+
+    def build_tree_from_ls(self, data: dict[str, Any]) -> None:
+        self.tree_widget.clear()
+
+        nodes = data.get("nodes") if isinstance(data, dict) else None
+        if not isinstance(nodes, list):
+            raise ValueError(".lsファイルの形式が正しくありません。")
+
+        root_item = self.tree_widget.invisibleRootItem()
+        for node in nodes:
+            self._add_serialized_item(root_item, node)
+
+    def export_launch_site(self) -> None:
+        if self.tree_widget.topLevelItemCount() == 0:
+            QtWidgets.QMessageBox.information(
+                self, "情報", "保存できるツリーがありません。"
+            )
+            return
+
+        options = QtWidgets.QFileDialog.Options()
+        file_path, _ = QtWidgets.QFileDialog.getSaveFileName(
+            self,
+            ".lsファイルとして保存",
+            "",
+            "Launch Site (*.ls);;All Files (*)",
+            options=options,
+        )
+
+        if not file_path:
+            return
+
+        if not file_path.lower().endswith(".ls"):
+            file_path += ".ls"
+
+        data = self.serialize_tree()
+
+        try:
+            with open(file_path, "w", encoding="utf-8") as fh:
+                json.dump(data, fh, ensure_ascii=False, indent=2)
+            print(f".lsファイルとして保存しました: {file_path}")
+        except Exception as exc:  # noqa: BLE001
+            QtWidgets.QMessageBox.critical(
+                self,
+                "エラー",
+                f".lsファイルの保存中にエラーが発生しました:\n{exc}",
+            )
+
+    def serialize_tree(self) -> dict[str, Any]:
+        root_item = self.tree_widget.invisibleRootItem()
+        nodes: list[dict[str, Any]] = []
+
+        for idx in range(root_item.childCount()):
+            serialized = self._serialize_tree_item(root_item.child(idx))
+            if serialized is not None:
+                nodes.append(serialized)
+
+        return {"version": 1, "nodes": nodes}
+
+    def _serialize_tree_item(
+        self, item: QtWidgets.QTreeWidgetItem
+    ) -> Optional[dict[str, Any]]:
+        geometry = item.data(0, ROLE_GEOMETRY)
+
+        if item.childCount() > 0 and geometry is None:
+            children: list[dict[str, Any]] = []
+            for idx in range(item.childCount()):
+                child_serialized = self._serialize_tree_item(item.child(idx))
+                if child_serialized is not None:
+                    children.append(child_serialized)
+
+            return {
+                "type": "folder",
+                "name": item.text(0),
+                "children": children,
+                "expanded": item.isExpanded(),
+            }
+
+        if geometry is None:
+            return None
+
+        color_data = item.data(0, ROLE_COLOR)
+        color_hex = color_data.name() if isinstance(color_data, QtGui.QColor) else None
+
+        visible_data = item.data(0, ROLE_VISIBLE)
+        visible = True if visible_data is None else bool(visible_data)
+
+        zone_value = item.data(0, ROLE_ZONE)
+
+        serialized_geometry = self._serialize_geometry(geometry)
+
+        return {
+            "type": "placemark",
+            "name": item.text(0),
+            "geometry": serialized_geometry,
+            "color": color_hex,
+            "visible": visible,
+            "zone": zone_value,
+        }
+
+    def _serialize_geometry(self, geometry: Any) -> Optional[dict[str, Any]]:
+        if isinstance(geometry, (Point, LineString, Polygon)):
+            return mapping(geometry)
+        return None
+
+    def _deserialize_geometry(self, data: Any) -> Optional[Any]:
+        if not isinstance(data, dict):
+            return None
+
+        try:
+            geom = shape(data)
+        except (TypeError, ValueError):
+            return None
+
+        if isinstance(geom, (Point, LineString, Polygon)):
+            return geom
+        return None
+
+    def _add_serialized_item(
+        self, parent_item: QtWidgets.QTreeWidgetItem, node_data: dict[str, Any]
+    ) -> Optional[QtWidgets.QTreeWidgetItem]:
+        node_type = node_data.get("type")
+        name = node_data.get("name") or "Unnamed"
+
+        if node_type == "folder" or (
+            node_type is None and isinstance(node_data.get("children"), list)
+        ):
+            item = QtWidgets.QTreeWidgetItem([name])
+            parent_item.addChild(item)
+
+            for child_data in node_data.get("children", []):
+                if isinstance(child_data, dict):
+                    self._add_serialized_item(item, child_data)
+
+            if self.get_all_leaf_nodes(item):
+                self.create_toggle_button(item)
+                toggle = self.tree_widget.itemWidget(item, 2)
+                if isinstance(toggle, QtWidgets.QPushButton):
+                    all_visible = all(
+                        leaf.data(0, ROLE_VISIBLE) is not False
+                        for leaf in self.get_all_leaf_nodes(item)
+                    )
+                    self.update_toggle_button_icon(toggle, all_visible)
+
+            expanded = node_data.get("expanded", True)
+            item.setExpanded(bool(expanded))
+            return item
+
+        if node_type == "placemark" or node_type is None:
+            item = QtWidgets.QTreeWidgetItem([name or "Unnamed Placemark"])
+            parent_item.addChild(item)
+
+            geometry = self._deserialize_geometry(node_data.get("geometry"))
+            if geometry is None:
+                geometry = None
+
+            color_hex = node_data.get("color")
+            color = (
+                QtGui.QColor(color_hex)
+                if isinstance(color_hex, str) and QtGui.QColor(color_hex).isValid()
+                else self._generate_random_color()
+            )
+
+            zone_value = node_data.get("zone")
+            if zone_value is None:
+                zone_value = self._default_zone_value(geometry)
+
+            visible_data = node_data.get("visible")
+            visible = True if visible_data is None else bool(visible_data)
+
+            item.setData(0, ROLE_GEOMETRY, geometry)
+            item.setData(0, ROLE_COLOR, color)
+            item.setData(0, ROLE_ZONE, zone_value)
+            item.setData(0, ROLE_VISIBLE, visible)
+
+            tooltip = self._format_geometry_tooltip(geometry)
+            if tooltip:
+                item.setToolTip(0, tooltip)
+                item.setToolTip(1, tooltip)
+                item.setToolTip(2, tooltip)
+
+            self.create_color_button(item)
+
+            if visible:
+                self._apply_item_color(item, color)
+            else:
+                item.setForeground(
+                    0, QtGui.QBrush(QtGui.QColor(QtCore.Qt.GlobalColor.gray))
+                )
+                item.setBackground(0, QtGui.QBrush(QtGui.QColor(0, 0, 0, 0)))
+            return item
+
+        raise ValueError("未知のノードタイプです。")
 
     def _add_folder_item(
         self, parent_item: QtWidgets.QTreeWidgetItem, folder: kml_folder
