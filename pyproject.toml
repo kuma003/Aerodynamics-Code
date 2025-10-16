@@ -12,4 +12,5 @@ dependencies = [
     "pyqtgraph>=0.13.7",
     "pyside6>=6.10.0",
     "shapely>=2.1.2",
+    "tomli-w>=1.2.0",
 ]

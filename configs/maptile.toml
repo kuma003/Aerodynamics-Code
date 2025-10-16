@@ -1,0 +1,33 @@
+# Map Tile Configurations
+#
+# [[maptile]] 
+# name = "地図の名前"
+# name_en = "地図の名前（英語）"  # 任意
+# url = "タイルのURL"
+# attribution = "著作権表示"
+# min_zoom = 最小ズームレベル
+# max_zoom = 最大ズームレベル
+# 
+
+[[maptile]]
+name = "国土地理院 標準地図"
+name_en = "GSI Standard Map"
+url = "https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png"
+attribution = "© 国土地理院"
+min_zoom = 5
+max_zoom = 8
+
+[[maptile]]
+name = "国土地理院 淡色地図"
+name_en = "GSI Pale Map"
+url = "https://cyberjapandata.gsi.go.jp/xyz/pale/{z}/{x}/{y}.png"
+attribution = "© 国土地理院"
+min_zoom = 5
+max_zoom = 18
+
+[[maptile]]
+name = "OpenStreetMap"
+url = "https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+attribution = "© OpenStreetMap contributors"
+min_zoom = 0
+max_zoom = 19

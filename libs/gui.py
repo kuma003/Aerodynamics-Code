@@ -3,8 +3,7 @@ import os
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtGui, QtWidgets
 
-from .tabs.launch_site import LaunchSiteTab
-from .tabs.simulation import SimulationTab
+from .tabs import SimulationTab, LaunchSiteTab, GraphConfigTab
 
 
 class MainWindow(QtWidgets.QSplitter):
@@ -38,6 +37,9 @@ class MainWindow(QtWidgets.QSplitter):
         self.launch_site_tab = LaunchSiteTab(self.icon_dir, self)
         self.tab_widget.addTab(self.launch_site_tab, "射場")
 
+        self.map_config_tab = GraphConfigTab(self)
+        self.tab_widget.addTab(self.map_config_tab, "地図設定")
+
         main_layout = QtWidgets.QVBoxLayout()
 
         central_widget = QtWidgets.QWidget()
@@ -45,9 +47,6 @@ class MainWindow(QtWidgets.QSplitter):
 
         self.plot_widget = pg.PlotWidget()
         main_layout.addWidget(self.plot_widget)
-
-        toggle_button = QtWidgets.QPushButton("サイドパネル表示切替")
-        main_layout.addWidget(toggle_button)
 
         self.addWidget(central_widget)
 
