@@ -7,6 +7,7 @@ from libs.gui import MainWindow
 
 def main():
     app = QApplication([])
+    app.setStyle("fusion")
     window = MainWindow()
     window.show()
     sys.exit(app.exec())
