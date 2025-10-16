@@ -25,7 +25,7 @@ class MainWindow(QtWidgets.QSplitter):
         self.side_panel_layout = QtWidgets.QVBoxLayout()
 
         self.side_panel = QtWidgets.QWidget()
-        self.side_panel.setMaximumWidth(400)
+        self.side_panel.setMinimumWidth(400)
         self.side_panel.setLayout(self.side_panel_layout)
         self.addWidget(self.side_panel)
 
@@ -39,7 +39,7 @@ class MainWindow(QtWidgets.QSplitter):
         self.tab_widget.addTab(self.launch_site_tab, "射場")
 
         self.map_config_tab = GraphConfigTab(self)
-        self.tab_widget.addTab(self.map_config_tab, "地図設定")
+        self.tab_widget.addTab(self.map_config_tab, "グラフ")
 
         self.launch_site_tab.site_centroid_changed.connect(
             self._on_site_centroid_changed
@@ -58,7 +58,7 @@ class MainWindow(QtWidgets.QSplitter):
 
         self.setStretchFactor(0, 0)
         self.setStretchFactor(1, 1)
-        self.setCollapsible(0, False)
+        self.setCollapsible(0, True)
         self.setCollapsible(1, False)
 
     def _on_site_centroid_changed(self, coord: Optional[Tuple[float, float]]) -> None:
