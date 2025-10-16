@@ -1,0 +1,394 @@
+# 参照座標系そのEPSGコード
+# 
+# [[crs]]
+# name_jp = "座標系の日本語名称"
+# name_en = "Coordinate System Name in English"  # 任意
+# type = "GCS" | "JPRCS" | "UTM" | "WebMercator"
+# epsg = EPSGコード (無い場合はtypeに応じた下位要素を使用)
+# [[JPRCS]]  # typeがJPRCSの場合に使用
+# name_jp = "日本語名称"
+# name_en = "Name in English"  # 任意
+# epsg = EPSGコード
+# lat = 原点緯度
+# lon = 原点経度
+# [[UTM]]  # typeがUTMの場合に使用
+# name_jp = "日本語名称"
+# name_en = "Name in English"  # 任意
+# epsg = EPSGコード
+# lon_min = 経度最小値
+# lon_max = 経度最大値
+#
+
+[[crs]]
+name_jp = "日本測地系2011"
+name_en = "JGD2011"
+type = "GCS"
+epsg = 6668
+
+[[crs]]
+name_jp = "WGS84"
+name_en = "WGS84"
+type = "GCS"
+epsg = 4326
+
+[[crs]]
+name_jp = "日本測地系2011"
+name_en = "JGD2011"
+type = "JPRCS" # Japan Plane Rectangular Coordinate System (日本平面直角座標系)
+
+[[JPRCS]]
+name_jp = "I系"
+name_en = "Zone I"
+epsg = 6669
+lat = 33.0000000000
+lon = 129.5000000000
+
+[[JPRCS]]
+name_jp = "II系"
+name_en = "Zone II"
+epsg = 6670
+lat = 33.0000000000
+lon = 131.0000000000
+
+[[JPRCS]]
+name_jp = "III系"
+name_en = "Zone III"
+epsg = 6671
+lat = 36.0000000000
+lon = 132.1666666667
+
+[[JPRCS]]
+name_jp = "IV系"
+name_en = "Zone IV"
+epsg = 6672
+lat = 33.0000000000
+lon = 133.5000000000
+
+[[JPRCS]]
+name_jp = "V系"
+name_en = "Zone V"
+epsg = 6673
+lat = 36.0000000000
+lon = 134.3333333333
+
+[[JPRCS]]
+name_jp = "VI系"
+name_en = "Zone VI"
+epsg = 6674
+lat = 36.0000000000
+lon = 136.0000000000
+
+[[JPRCS]]
+name_jp = "VII系"
+name_en = "Zone VII"
+epsg = 6675
+lat = 36.0000000000
+lon = 137.1666666667
+
+[[JPRCS]]
+name_jp = "VIII系"
+name_en = "Zone VIII"
+epsg = 6676
+lat = 36.0000000000
+lon = 138.5000000000
+
+[[JPRCS]]
+name_jp = "IX系"
+name_en = "Zone IX"
+epsg = 6677
+lat = 36.0000000000
+lon = 139.8333333333
+
+[[JPRCS]]
+name_jp = "X系"
+name_en = "Zone X"
+epsg = 6678
+lat = 40.0000000000
+lon = 140.8333333333
+
+[[JPRCS]]
+name_jp = "XI系"
+name_en = "Zone XI"
+epsg = 6679
+lat = 44.0000000000
+lon = 140.2500000000
+
+[[JPRCS]]
+name_jp = "XII系"
+name_en = "Zone XII"
+epsg = 6680
+lat = 44.0000000000
+lon = 142.2500000000
+
+[[JPRCS]]
+name_jp = "XIII系"
+name_en = "Zone XIII"
+epsg = 6681
+lat = 44.0000000000
+lon = 144.2500000000
+
+[[JPRCS]]
+name_jp = "XIV系"
+name_en = "Zone XIV"
+epsg = 6682
+lat = 26.0000000000
+lon = 142.0000000000
+
+[[JPRCS]]
+name_jp = "XV系"
+name_en = "Zone XV"
+epsg = 6683
+lat = 26.0000000000
+lon = 127.5000000000
+
+[[JPRCS]]
+name_jp = "XVI系"
+name_en = "Zone XVI"
+epsg = 6684
+lat = 26.0000000000
+lon = 124.0000000000
+
+[[JPRCS]]
+name_jp = "XVII系"
+name_en = "Zone XVII"
+epsg = 6685
+lat = 26.0000000000
+lon = 131.0000000000
+
+[[JPRCS]]
+name_jp = "XVIII系"
+name_en = "Zone XVIII"
+epsg = 6686
+lat = 20.0000000000
+lon = 136.0000000000
+
+[[JPRCS]]
+name_jp = "XIX系"
+name_en = "Zone XIX"
+epsg = 6687
+lat = 26.0000000000
+lon = 154.0000000000
+
+[[crs]]
+name_jp = "日本測地系2000"
+name_en = "JGD2000"
+type = "JPRCS" # Japan Plane Rectangular Coordinate System (日本平面直角座標系)
+
+[[JPRCS]]
+name_jp = "I系"
+name_en = "Zone I"
+epsg = 2243
+lat = 33.0000000000
+lon = 129.5000000000
+
+[[JPRCS]]
+name_jp = "II系"
+name_en = "Zone II"
+epsg = 2444
+lat = 33.0000000000
+lon = 131.0000000000
+
+[[JPRCS]]
+name_jp = "III系"
+name_en = "Zone III"
+epsg = 2445
+lat = 36.0000000000
+lon = 132.1666666667
+
+[[JPRCS]]
+name_jp = "IV系"
+name_en = "Zone IV"
+epsg = 2446
+lat = 33.0000000000
+lon = 133.5000000000
+
+[[JPRCS]]
+name_jp = "V系"
+name_en = "Zone V"
+epsg = 2447
+lat = 36.0000000000
+lon = 134.3333333333
+
+[[JPRCS]]
+name_jp = "VI系"
+name_en = "Zone VI"
+epsg = 2448
+lat = 36.0000000000
+lon = 136.0000000000
+
+[[JPRCS]]
+name_jp = "VII系"
+name_en = "Zone VII"
+epsg = 2449
+lat = 36.0000000000
+lon = 137.1666666667
+
+[[JPRCS]]
+name_jp = "VIII系"
+name_en = "Zone VIII"
+epsg = 2450
+lat = 36.0000000000
+lon = 138.5000000000
+
+[[JPRCS]]
+name_jp = "IX系"
+name_en = "Zone IX"
+epsg = 2451
+lat = 36.0000000000
+lon = 139.8333333333
+
+[[JPRCS]]
+name_jp = "X系"
+name_en = "Zone X"
+epsg = 2452
+lat = 40.0000000000
+lon = 140.8333333333
+
+[[JPRCS]]
+name_jp = "XI系"
+name_en = "Zone XI"
+epsg = 2453
+lat = 44.0000000000
+lon = 140.2500000000
+
+[[JPRCS]]
+name_jp = "XII系"
+name_en = "Zone XII"
+epsg = 2454
+lat = 44.0000000000
+lon = 142.2500000000
+
+[[JPRCS]]
+name_jp = "XIII系"
+name_en = "Zone XIII"
+epsg = 2455
+lat = 44.0000000000
+lon = 144.2500000000
+
+[[JPRCS]]
+name_jp = "XIV系"
+name_en = "Zone XIV"
+epsg = 2456
+lat = 26.0000000000
+lon = 142.0000000000
+
+[[JPRCS]]
+name_jp = "XV系"
+name_en = "Zone XV"
+epsg = 2457
+lat = 26.0000000000
+lon = 127.5000000000
+
+[[JPRCS]]
+name_jp = "XVI系"
+name_en = "Zone XVI"
+epsg = 2458
+lat = 26.0000000000
+lon = 124.0000000000
+
+[[JPRCS]]
+name_jp = "XVII系"
+name_en = "Zone XVII"
+epsg = 2459
+lat = 26.0000000000
+lon = 131.0000000000
+
+[[JPRCS]]
+name_jp = "XVIII系"
+name_en = "Zone XVIII"
+epsg = 2460
+lat = 20.0000000000
+lon = 136.0000000000
+
+[[JPRCS]]
+name_jp = "XIX系"
+name_en = "Zone XIX"
+epsg = 2461
+lat = 26.0000000000
+lon = 154.0000000000
+
+[[crs]]
+name_jp = "日本測地系2011"
+name_en = "JGD2011"
+type = "UTM" # Universal Transverse Mercator (ユニバーサル横メルカトル図法)
+
+[[UTM]]
+name_jp = "第51帯"
+name_en = "Zone 51"
+epsg = 6688
+lon_min = 120
+lon_max = 126
+
+[[UTM]]
+name_jp = "第52帯"
+name_en = "Zone 52"
+epsg = 6689
+lon_min = 126
+lon_max = 132
+
+[[UTM]]
+name_jp = "第53帯"
+name_en = "Zone 53"
+epsg = 6690
+lon_min = 132
+lon_max = 138
+
+[[UTM]]
+name_jp = "第54帯"
+name_en = "Zone 54"
+epsg = 6691
+lon_min = 138
+lon_max = 144
+
+[[UTM]]
+name_jp = "第55帯"
+name_en = "Zone 55"
+epsg = 6692
+lon_min = 144
+lon_max = 150
+
+[[crs]]
+name_jp = "日本測地系2000"
+name_en = "JGD2000"
+type = "UTM" # Universal Transverse Mercator (ユニバーサル横メルカトル図法)
+
+[[UTM]]
+name_jp = "第51帯"
+name_en = "Zone 51"
+epsg = 3097
+lon_min = 120
+lon_max = 126
+
+[[UTM]]
+name_jp = "第52帯"
+name_en = "Zone 52"
+epsg = 3098
+lon_min = 126
+lon_max = 132
+
+[[UTM]]
+name_jp = "第53帯"
+name_en = "Zone 53"
+epsg = 3099
+lon_min = 132
+lon_max = 138
+
+[[UTM]]
+name_jp = "第54帯"
+name_en = "Zone 54"
+epsg = 3100
+lon_min = 138
+lon_max = 144
+
+[[UTM]]
+name_jp = "第55帯"
+name_en = "Zone 55"
+epsg = 3101
+lon_min = 144
+lon_max = 150
+
+[[crs]]
+name_jp  = "Webメルカトル"
+name_en  = "Web Mercator"
+type     = "WebMercator"
+epsg     = 3857
