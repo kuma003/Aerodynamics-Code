@@ -69,7 +69,7 @@ class GraphConfigTab(QtWidgets.QWidget):
 
         layout.addWidget(form_widget)
 
-        layout.addWidget(create_section_title("内部計算座標系"))
+        layout.addWidget(create_section_title("参照座標系"))
 
         layout.addStretch()
 
