@@ -1,4 +1,5 @@
 import os
+from typing import Optional, Tuple
 
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtGui, QtWidgets
@@ -40,6 +41,11 @@ class MainWindow(QtWidgets.QSplitter):
         self.map_config_tab = GraphConfigTab(self)
         self.tab_widget.addTab(self.map_config_tab, "地図設定")
 
+        self.launch_site_tab.site_centroid_changed.connect(
+            self._on_site_centroid_changed
+        )
+        self._on_site_centroid_changed(self.launch_site_tab.compute_site_centroid())
+
         main_layout = QtWidgets.QVBoxLayout()
 
         central_widget = QtWidgets.QWidget()
@@ -54,3 +60,6 @@ class MainWindow(QtWidgets.QSplitter):
         self.setStretchFactor(1, 1)
         self.setCollapsible(0, False)
         self.setCollapsible(1, False)
+
+    def _on_site_centroid_changed(self, coord: Optional[Tuple[float, float]]) -> None:
+        self.map_config_tab.set_site_coordinate(coord)

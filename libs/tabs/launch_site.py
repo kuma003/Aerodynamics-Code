@@ -5,6 +5,7 @@ from typing import Any, Optional
 
 from pyqtgraph.Qt import QtCore, QtGui, QtWidgets
 from shapely.geometry import LineString, Point, Polygon, mapping, shape
+from shapely.ops import unary_union
 
 from ..kml_reader import kml_folder, kml_placemark, read_kml
 from ..ui_helpers import create_section_title
@@ -14,8 +15,17 @@ ROLE_COLOR = ROLE_VISIBLE + 1
 ROLE_ZONE = ROLE_COLOR + 1
 ROLE_GEOMETRY = ROLE_ZONE + 1
 
+if hasattr(QtCore, "Signal"):
+    Signal = QtCore.Signal
+elif hasattr(QtCore, "pyqtSignal"):
+    Signal = QtCore.pyqtSignal
+else:  # pragma: no cover - unexpected Qt binding
+    raise AttributeError("Qt binding does not provide Signal or pyqtSignal")
+
 
 class LaunchSiteTab(QtWidgets.QWidget):
+    site_centroid_changed = Signal(object)
+
     def __init__(self, icon_dir: str, parent: QtWidgets.QWidget | None = None):
         super().__init__(parent)
         self.icon_dir = icon_dir
@@ -120,10 +130,12 @@ class LaunchSiteTab(QtWidgets.QWidget):
     def build_tree_from_kml(self, root_folder: Optional[kml_folder]) -> None:
         self.tree_widget.clear()
         if root_folder is None:
+            self._emit_site_centroid()
             return
 
         self._add_folder_item(self.tree_widget.invisibleRootItem(), root_folder)
         self.tree_widget.expandAll()
+        self._emit_site_centroid()
 
     def build_tree_from_ls(self, data: dict[str, Any]) -> None:
         self.tree_widget.clear()
@@ -135,6 +147,7 @@ class LaunchSiteTab(QtWidgets.QWidget):
         root_item = self.tree_widget.invisibleRootItem()
         for node in nodes:
             self._add_serialized_item(root_item, node)
+        self._emit_site_centroid()
 
     def export_launch_site(self) -> None:
         if self.tree_widget.topLevelItemCount() == 0:
@@ -613,3 +626,38 @@ class LaunchSiteTab(QtWidgets.QWidget):
 
         traverse(parent_item)
         return leaf_nodes
+
+    def compute_site_centroid(self) -> Optional[tuple[float, float]]:
+        if self.tree_widget.topLevelItemCount() == 0:
+            return None
+
+        geometries: list[Any] = []
+        root = self.tree_widget.invisibleRootItem()
+
+        for idx in range(root.childCount()):
+            item = root.child(idx)
+            for leaf in self.get_all_leaf_nodes(item):
+                geometry = leaf.data(0, ROLE_GEOMETRY)
+                if isinstance(geometry, (Point, LineString, Polygon)):
+                    geometries.append(geometry)
+
+        if not geometries:
+            return None
+
+        try:
+            combined = unary_union(geometries)
+        except Exception:  # pragma: no cover - defensive
+            return None
+
+        if combined.is_empty:
+            return None
+
+        centroid = combined.centroid
+        if centroid.is_empty:
+            return None
+
+        return (float(centroid.y), float(centroid.x))
+
+    def _emit_site_centroid(self) -> None:
+        coord = self.compute_site_centroid()
+        self.site_centroid_changed.emit(coord)

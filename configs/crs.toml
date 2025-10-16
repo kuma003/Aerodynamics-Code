@@ -26,13 +26,19 @@ type = "GCS"
 epsg = 6668
 
 [[crs]]
+name_jp = "日本測地系2000"
+name_en = "JGD2000"
+type = "GCS"
+epsg = 4612
+
+[[crs]]
 name_jp = "WGS84"
 name_en = "WGS84"
 type = "GCS"
 epsg = 4326
 
 [[crs]]
-name_jp = "日本測地系2011"
+name_jp = "日本測地系2011 (平面直交座標系)"
 name_en = "JGD2011"
 type = "JPRCS" # Japan Plane Rectangular Coordinate System (日本平面直角座標系)
 
@@ -170,7 +176,7 @@ lat = 26.0000000000
 lon = 154.0000000000
 
 [[crs]]
-name_jp = "日本測地系2000"
+name_jp = "日本測地系2000 (平面直交座標系)"
 name_en = "JGD2000"
 type = "JPRCS" # Japan Plane Rectangular Coordinate System (日本平面直角座標系)
 
@@ -308,7 +314,7 @@ lat = 26.0000000000
 lon = 154.0000000000
 
 [[crs]]
-name_jp = "日本測地系2011"
+name_jp = "日本測地系2011 (ユニバーサル横メルカトル)"
 name_en = "JGD2011"
 type = "UTM" # Universal Transverse Mercator (ユニバーサル横メルカトル図法)
 
@@ -348,7 +354,7 @@ lon_min = 144
 lon_max = 150
 
 [[crs]]
-name_jp = "日本測地系2000"
+name_jp = "日本測地系2000 (ユニバーサル横メルカトル)"
 name_en = "JGD2000"
 type = "UTM" # Universal Transverse Mercator (ユニバーサル横メルカトル図法)
 

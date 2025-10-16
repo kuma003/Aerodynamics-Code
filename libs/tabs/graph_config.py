@@ -5,6 +5,16 @@ from typing import Any, Optional
 import tomllib
 from pyqtgraph.Qt import QtWidgets
 
+from ..crs_utils import (
+    CRSCatalogError,
+    DEFAULT_SITE_COORD,
+    GCS,
+    ProjectedCRS,
+    ProjectedCRSVariant,
+    choose_geographic_crs,
+    choose_projected_group,
+    load_crs_catalog,
+)
 from ..ui_helpers import create_form_widget, create_section_title
 
 
@@ -32,7 +42,13 @@ class GraphConfigTab(QtWidgets.QWidget):
         super().__init__(parent)
         self._map_entries: list[MapTileEntry] = []
         self._map_file_path: Path = self.CONFIG_PATH
+        self._gcs_entries: list[GCS] = []
+        self._projected_entries: list[ProjectedCRS] = []
+        self._current_proj_variants: list[ProjectedCRSVariant] = []
+        self._crs_ready = False
+        self._site_coord = DEFAULT_SITE_COORD
         self._build_ui()
+        self._load_crs_data()
         self._load_map_file()
 
     def _build_ui(self) -> None:
@@ -41,39 +57,70 @@ class GraphConfigTab(QtWidgets.QWidget):
 
         layout.addWidget(create_section_title("地図設定"))
 
-        form_widget = create_form_widget()
-        form_layout = form_widget.layout()
+        self.map_form_widget = create_form_widget()
+        self.map_form_layout = self.map_form_widget.layout()
 
         self.map_combo = QtWidgets.QComboBox()
         self.map_combo.currentIndexChanged.connect(self._on_map_selected)
-        form_layout.addRow("地図:", self.map_combo)
+        self.map_form_layout.addRow("地図:", self.map_combo)
 
         self.min_zoom_label = QtWidgets.QLabel("-")
         self.min_zoom_label.setFixedHeight(20)
-        form_layout.addRow("最小ズーム:", self.min_zoom_label)
+        self.map_form_layout.addRow("最小ズーム:", self.min_zoom_label)
 
         self.max_zoom_label = QtWidgets.QLabel("-")
         self.max_zoom_label.setFixedHeight(20)
-        form_layout.addRow("最大ズーム:", self.max_zoom_label)
+        self.map_form_layout.addRow("最大ズーム:", self.max_zoom_label)
 
         self.zoom_spin = QtWidgets.QSpinBox()
         self.zoom_spin.setRange(0, 25)
         self.zoom_spin.valueChanged.connect(self._on_zoom_value_changed)
-        form_layout.addRow("ズームレベル:", self.zoom_spin)
+        self.map_form_layout.addRow("ズームレベル:", self.zoom_spin)
 
         self.attribution_edit = QtWidgets.QPlainTextEdit()
         self.attribution_edit.setPlaceholderText("著作権表示を入力")
-        self.attribution_edit.setFixedHeight(60)
+        self.attribution_edit.setMaximumHeight(80)
+        self.attribution_edit.sizePolicy().setVerticalStretch(0)
         self.attribution_edit.textChanged.connect(self._on_attribution_text_changed)
-        form_layout.addRow("Attribution:", self.attribution_edit)
+        self.map_form_layout.addRow("Attribution:", self.attribution_edit)
 
-        layout.addWidget(form_widget)
+        layout.addWidget(self.map_form_widget)
 
         layout.addWidget(create_section_title("参照座標系"))
+
+        self.crs_form_widget = create_form_widget()
+        self.crs_form_layout = self.crs_form_widget.layout()
+
+        self.gcs_combo = QtWidgets.QComboBox()
+        self.crs_form_layout.addRow("地理座標系:", self.gcs_combo)
+
+        self.proj_group_combo = QtWidgets.QComboBox()
+        self.proj_group_combo.currentIndexChanged.connect(self._on_proj_group_changed)
+        self.crs_form_layout.addRow("投影座標系:", self.proj_group_combo)
+
+        self.proj_variant_combo = QtWidgets.QComboBox()
+        self.proj_variant_combo.currentIndexChanged.connect(
+            self._on_proj_variant_changed
+        )
+
+        self.auto_variant_check = QtWidgets.QCheckBox("射場座標から自動選択")
+        self.auto_variant_check.setChecked(True)
+        self.auto_variant_check.toggled.connect(self._on_auto_variant_toggled)
+
+        variant_row = QtWidgets.QWidget()
+        variant_layout = QtWidgets.QHBoxLayout()
+        variant_layout.setContentsMargins(0, 0, 0, 0)
+        variant_layout.setSpacing(8)
+        variant_layout.addWidget(self.proj_variant_combo, 1)
+        variant_layout.addWidget(self.auto_variant_check)
+        variant_row.setLayout(variant_layout)
+        self.crs_form_layout.addRow("系/帯:", variant_row)
+        layout.addWidget(self.crs_form_widget)
 
         layout.addStretch()
 
         self._set_controls_enabled(False)
+        self._update_crs_widget_states()
 
     def _set_controls_enabled(self, enabled: bool) -> None:
         self.map_combo.setEnabled(enabled)
@@ -220,3 +267,187 @@ class GraphConfigTab(QtWidgets.QWidget):
         if 0 <= index < len(self._map_entries):
             return self._map_entries[index]
         return None
+
+    def _load_crs_data(self) -> None:
+        try:
+            catalog = load_crs_catalog()
+        except CRSCatalogError as exc:
+            QtWidgets.QMessageBox.critical(
+                self,
+                "エラー",
+                f"CRS設定の読み込みに失敗しました:\n{exc}",
+            )
+            self._crs_ready = False
+            self._gcs_entries.clear()
+            self._projected_entries.clear()
+            self._current_proj_variants = []
+            self._update_crs_widget_states()
+            return
+
+        self._gcs_entries = list(catalog.gcs)
+        self._projected_entries = list(catalog.projected)
+        self._crs_ready = True
+
+        self._populate_gcs_combo()
+        self._populate_proj_group_combo()
+        self._set_initial_gcs_selection()
+        self._set_initial_projected_selection()
+        self._update_crs_widget_states()
+
+    def _populate_gcs_combo(self) -> None:
+        self.gcs_combo.blockSignals(True)
+        self.gcs_combo.clear()
+        for entry in self._gcs_entries:
+            self.gcs_combo.addItem(entry.display_label(), entry)
+        self.gcs_combo.blockSignals(False)
+        if self._gcs_entries:
+            self.gcs_combo.setCurrentIndex(0)
+
+    def _populate_proj_group_combo(self) -> None:
+        self.proj_group_combo.blockSignals(True)
+        self.proj_group_combo.clear()
+        for group in self._projected_entries:
+            self.proj_group_combo.addItem(group.display_label(), group)
+        self.proj_group_combo.blockSignals(False)
+
+        if self._projected_entries:
+            self.proj_group_combo.setCurrentIndex(0)
+            self._populate_proj_variant_combo(0)
+        else:
+            self._populate_proj_variant_combo(-1)
+
+    def _populate_proj_variant_combo(
+        self,
+        group_index: int,
+        *,
+        preferred: ProjectedCRSVariant | None = None,
+    ) -> None:
+        self._current_proj_variants = []
+        self.proj_variant_combo.blockSignals(True)
+        self.proj_variant_combo.clear()
+
+        if not (0 <= group_index < len(self._projected_entries)):
+            self.proj_variant_combo.blockSignals(False)
+            return
+
+        variants = list(self._projected_entries[group_index].variants)
+        self._current_proj_variants = variants
+
+        for variant in variants:
+            self.proj_variant_combo.addItem(variant.display_label(), variant)
+
+        if preferred and preferred in variants:
+            self.proj_variant_combo.setCurrentIndex(variants.index(preferred))
+        elif variants:
+            self.proj_variant_combo.setCurrentIndex(0)
+
+        self.proj_variant_combo.blockSignals(False)
+
+    def _set_initial_gcs_selection(self) -> None:
+        if not self._gcs_entries:
+            return
+        suggested = choose_geographic_crs(self._gcs_entries)
+        try:
+            index = self._gcs_entries.index(suggested) if suggested else 0
+        except ValueError:
+            index = 0
+        self._set_combo_index(self.gcs_combo, index)
+
+    def _set_initial_projected_selection(self) -> None:
+        if not self._projected_entries:
+            self._populate_proj_variant_combo(-1)
+            return
+
+        selection = choose_projected_group(self._projected_entries, self._site_coord)
+        if selection is None:
+            self._set_combo_index(self.proj_group_combo, 0)
+            if self.auto_variant_check.isChecked():
+                self._apply_auto_variant_selection(0)
+            else:
+                self._populate_proj_variant_combo(0)
+            return
+
+        group, variant = selection
+        try:
+            group_index = self._projected_entries.index(group)
+        except ValueError:
+            group_index = 0
+
+        self._set_combo_index(self.proj_group_combo, group_index)
+        if self.auto_variant_check.isChecked():
+            self._apply_auto_variant_selection(group_index)
+        else:
+            self._populate_proj_variant_combo(group_index, preferred=variant)
+
+    def _apply_auto_variant_selection(self, group_index: Optional[int] = None) -> None:
+        if group_index is None:
+            group_index = self.proj_group_combo.currentIndex()
+
+        if not (0 <= group_index < len(self._projected_entries)):
+            self._populate_proj_variant_combo(-1)
+            return
+
+        group = self._projected_entries[group_index]
+        preferred = group.best_variant_for_coordinate(self._site_coord)
+        self._populate_proj_variant_combo(group_index, preferred=preferred)
+
+    def set_site_coordinate(self, coord: Optional[tuple[float, float]]) -> None:
+        self._site_coord = coord if coord is not None else DEFAULT_SITE_COORD
+        if not self._crs_ready:
+            return
+        if self.auto_variant_check.isChecked():
+            self._apply_auto_variant_selection()
+        self._update_crs_widget_states()
+
+    def _set_combo_index(self, combo: QtWidgets.QComboBox, index: int) -> None:
+        if index < 0 or index >= combo.count():
+            return
+        combo.blockSignals(True)
+        combo.setCurrentIndex(index)
+        combo.blockSignals(False)
+
+    def _on_auto_variant_toggled(self, checked: bool) -> None:
+        if self._crs_ready and checked:
+            self._apply_auto_variant_selection()
+        self._update_crs_widget_states()
+
+    def _on_proj_group_changed(self, index: int) -> None:
+        if not self._crs_ready:
+            return
+
+        if self.auto_variant_check.isChecked():
+            self._apply_auto_variant_selection(index)
+        else:
+            self._populate_proj_variant_combo(index)
+        self._update_crs_widget_states()
+
+    def _on_proj_variant_changed(self, _index: int) -> None:
+        if self.auto_variant_check.isChecked():
+            return
+        # Manual selection requires no immediate action yet, but we keep the handler
+        # for future integration (e.g., persisting settings).
+
+    def _update_crs_widget_states(self) -> None:
+        has_gcs = bool(self._gcs_entries)
+        has_proj = bool(self._projected_entries)
+        has_variants = bool(self._current_proj_variants)
+        ready = self._crs_ready
+
+        self.gcs_combo.setEnabled(ready and has_gcs)
+        self.proj_group_combo.setEnabled(ready and has_proj)
+
+        auto_available = ready and has_proj and has_variants
+        if ready and not auto_available and self.auto_variant_check.isChecked():
+            self.auto_variant_check.blockSignals(True)
+            self.auto_variant_check.setChecked(False)
+            self.auto_variant_check.blockSignals(False)
+
+        self.auto_variant_check.setEnabled(auto_available)
+
+        manual_variant_enabled = (
+            ready
+            and has_proj
+            and has_variants
+            and not self.auto_variant_check.isChecked()
+        )
+        self.proj_variant_combo.setEnabled(manual_variant_enabled)

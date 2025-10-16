@@ -6,6 +6,7 @@ readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
     "geopandas>=1.1.1",
+    "numpy>=2.3.4",
     "pygithub>=2.8.1",
     "pykml>=0.2.0",
     "pyqtgraph>=0.13.7",
