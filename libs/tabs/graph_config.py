@@ -5,16 +5,7 @@ from typing import Any, Optional
 import tomllib
 from pyqtgraph.Qt import QtWidgets
 
-from ..crs_utils import (
-    CRSCatalogError,
-    DEFAULT_SITE_COORD,
-    GCS,
-    ProjectedCRS,
-    ProjectedCRSVariant,
-    choose_geographic_crs,
-    choose_projected_group,
-    load_crs_catalog,
-)
+from ..crs_utils import *
 from ..ui_helpers import create_form_widget, create_section_title
 
 
@@ -54,6 +45,20 @@ class GraphConfigTab(QtWidgets.QWidget):
     def _build_ui(self) -> None:
         layout = QtWidgets.QVBoxLayout()
         self.setLayout(layout)
+
+        layout.addWidget(create_section_title("グラフ設定"))
+
+        self.graph_form_widget = create_form_widget()
+        self.graph_form_layout = self.graph_form_widget.layout()
+
+        self.graph_width_spin = QtWidgets.QSpinBox(value=600)
+        self.graph_width_spin.setRange(100, 10000)
+        self.graph_height_spin = QtWidgets.QSpinBox(value=400)
+        self.graph_height_spin.setRange(100, 10000)
+        self.graph_form_layout.addRow("横幅:", self.graph_width_spin)
+        self.graph_form_layout.addRow("高さ:", self.graph_height_spin)
+
+        layout.addWidget(self.graph_form_widget)
 
         layout.addWidget(create_section_title("地図設定"))
 
@@ -450,4 +455,3 @@ class GraphConfigTab(QtWidgets.QWidget):
             and has_variants
             and not self.auto_variant_check.isChecked()
         )
-        self.proj_variant_combo.setEnabled(manual_variant_enabled)
