@@ -1,5 +1,6 @@
 {
-  "python" :{
+  "python.defaultInterpreterPath": "${workspaceFolder}/.venv/Scripts/python.exe",
+  "[python]" :{
     "editor.tabSize": 4
   },
   "[toml]": {
