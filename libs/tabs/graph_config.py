@@ -3,7 +3,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 import tomllib
-from pyqtgraph.Qt import QtWidgets
+from pyqtgraph.Qt import QtCore, QtWidgets
 
 from ..crs_utils import *
 from ..ui_helpers import create_form_widget, create_section_title
@@ -29,6 +29,8 @@ class GraphConfigTab(QtWidgets.QWidget):
         Path(__file__).resolve().parent.parent.parent / "configs" / "maptile.toml"
     )
 
+    graph_settings_changed = QtCore.Signal()
+
     def __init__(self, parent: QtWidgets.QWidget | None = None):
         super().__init__(parent)
         self._map_entries: list[MapTileEntry] = []
@@ -41,6 +43,7 @@ class GraphConfigTab(QtWidgets.QWidget):
         self._build_ui()
         self._load_crs_data()
         self._load_map_file()
+        self._emit_graph_settings_changed()
 
     def _build_ui(self) -> None:
         layout = QtWidgets.QVBoxLayout()
@@ -53,12 +56,28 @@ class GraphConfigTab(QtWidgets.QWidget):
         graph_section.layout().addWidget(self.graph_form_widget)
         self.graph_form_layout = self.graph_form_widget.layout()
 
-        self.graph_width_spin = QtWidgets.QSpinBox(value=600)
-        self.graph_width_spin.setRange(100, 10000)
-        self.graph_height_spin = QtWidgets.QSpinBox(value=400)
-        self.graph_height_spin.setRange(100, 10000)
+        self.graph_width_spin = QtWidgets.QSpinBox(minimum=100, maximum=10000)
+        self.graph_height_spin = QtWidgets.QSpinBox(minimum=100, maximum=10000)
+        self.graph_width_spin.setValue(800)
+        self.graph_height_spin.setValue(600)
+        self.graph_width_spin.valueChanged.connect(self._emit_graph_settings_changed)
+        self.graph_height_spin.valueChanged.connect(self._emit_graph_settings_changed)
         self.graph_form_layout.addRow("横幅:", self.graph_width_spin)
         self.graph_form_layout.addRow("高さ:", self.graph_height_spin)
+
+        self.graph_export_dpi_spin = QtWidgets.QSpinBox(value=96)
+        self.graph_export_dpi_spin.setRange(36, 600)
+        self.graph_export_dpi_spin.valueChanged.connect(
+            self._emit_graph_settings_changed
+        )
+        self.graph_form_layout.addRow("DPI:", self.graph_export_dpi_spin)
+
+        self.graph_export_format_combo = QtWidgets.QComboBox()
+        self.graph_export_format_combo.addItems(["PNG", "SVG", "PDF"])
+        self.graph_export_format_combo.currentIndexChanged.connect(
+            self._emit_graph_settings_changed
+        )
+        self.graph_form_layout.addRow("出力形式:", self.graph_export_format_combo)
 
         map_section = create_section_title("地図設定")
         layout.addWidget(map_section)
@@ -273,6 +292,19 @@ class GraphConfigTab(QtWidgets.QWidget):
         if 0 <= index < len(self._map_entries):
             return self._map_entries[index]
         return None
+
+    def graph_dimensions(self) -> tuple[int, int]:
+        return self.graph_width_spin.value(), self.graph_height_spin.value()
+
+    def graph_dpi(self) -> int:
+        return self.graph_export_dpi_spin.value()
+
+    def graph_format(self) -> str:
+        return self.graph_export_format_combo.currentText().strip().lower()
+
+    def _emit_graph_settings_changed(self) -> None:
+        # Emit a consolidated signal so consumers can react to any relevant change.
+        self.graph_settings_changed.emit()
 
     def _load_crs_data(self) -> None:
         try:
