@@ -474,9 +474,7 @@ class MainWindow(QtWidgets.QSplitter):
         self.launch_site_tab.site_centroid_changed.connect(
             self._on_site_centroid_changed
         )
-        self._on_site_centroid_changed(
-            self.launch_site_tab.compute_site_centroid()
-        )
+        self._on_site_centroid_changed(self.launch_site_tab.compute_site_centroid())
 
     def _on_site_centroid_changed(self, coord: Optional[Tuple[float, float]]) -> None:
         self.map_config_tab.set_site_coordinate(coord)
